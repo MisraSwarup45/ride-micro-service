@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, getProfile, updateProfile, updateAvailability, deteleProfile, waitForRideRequest} = require('../controllers/authController');
+const { register, login, getProfile, updateProfile, updateAvailability, deteleProfile} = require('../controllers/authController');
+const { waitForRideRequest } = require('../controllers/captainRideController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 router.post('/register', register);

@@ -1,9 +1,10 @@
+const dotenv = require('dotenv');
+dotenv.config();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Captain = require('../models/Captain');
-const { subscribeToQueue } = require('../service/rabbit');
 
-let pendingRequests = [];
+const axios = require('axios');
 
 exports.register = async (req, res) => {
     try {
@@ -73,6 +74,20 @@ exports.updateAvailability = async (req, res) => {
         const captain = await Captain.findById(req.user.id);
         captain.availability = !captain.availability;
 
+        if(captain.availability) {
+            const response = await axios.post(`${process.env.LOCATION_SERVICE}/api/locations/update`, {
+                captainId: req.user.id,
+                latitude: 28.7041,
+                longitude: 77.1025
+            })
+
+            if(response.status !== 200) {
+                return res.status(500).json({ message: 'Failed to update location' });
+            }
+
+            console.log('Location updated successfully');
+        }
+
         await captain.save();
         res.status(200).json({ message: 'Availability updated successfully' });
     } catch (error) {
@@ -88,27 +103,3 @@ exports.deteleProfile = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 }
-
-exports.waitForRideRequest = async (req, res) => {
-    try {
-        req.setTimeout(30000, () => {
-            res.status(200).json({ message: 'No ride requests' });
-        });
-
-        pendingRequests.push(res);
-
-        req.on('close', () => {
-            pendingRequests = pendingRequests.filter(pendingRes => pendingRes !== res);
-        });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-subscribeToQueue('new-ride', async (data) => {
-    const ride = JSON.parse(data);
-    pendingRequests.forEach((res) => {
-        res.status(200).json(ride);
-    });
-    pendingRequests = [];
-});

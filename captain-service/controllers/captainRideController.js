@@ -1,4 +1,7 @@
+const { subscribeToQueue } = require('../service/rabbit');
+
 let pendingRequests = [];
+
 
 exports.waitForRideRequest = async (req, res) => {
     try {
@@ -16,19 +19,10 @@ exports.waitForRideRequest = async (req, res) => {
     }
 };
 
-exports.processRideRequest = async (req, res) => {
-    try {
-        const { data } = req.body; 
-        const ride = JSON.parse(data);
-
-        pendingRequests.forEach((pendingRes) => {
-            pendingRes.status(200).json(ride);
-        });
-
-        pendingRequests = [];
-
-        res.status(200).json({ message: "Ride request processed successfully" });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
+subscribeToQueue('new-ride', async (data) => {
+    const ride = JSON.parse(data);
+    pendingRequests.forEach((res) => {
+        res.status(200).json(ride);
+    });
+    pendingRequests = [];
+});
