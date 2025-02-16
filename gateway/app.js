@@ -7,6 +7,7 @@ app.use('/api/users', expressProxy('http://localhost:3001'));
 app.use('/api/captain', expressProxy('http://localhost:3002'));
 app.use('/api/ride', expressProxy('http://localhost:3003'));
 app.use('/api/rabbitmq', expressProxy('http://localhost:3004'));
+app.use('/api/locations', expressProxy('http://localhost:3005'));
 
 
 const port = process.env.PORT || 3000;
