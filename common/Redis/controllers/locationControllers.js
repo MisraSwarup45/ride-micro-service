@@ -27,3 +27,23 @@ exports.findNearbyCaptains = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+exports.removeCaptain = async (req, res) =>{
+    try {
+        const { captainId } = req.body;
+
+        if (!captainId) {
+            return res.status(400).json({ message: 'Captain ID is required' });
+        }
+
+        const result = await redis.zrem('captains', captainId);
+
+        if (result === 0) {
+            return res.status(404).json({ message: 'Captain not found in Redis' });
+        }
+
+        res.status(200).json({ message: 'Captain removed from Redis successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+}

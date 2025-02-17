@@ -35,8 +35,6 @@ const calculateFare = async (fromLat, fromLng, toLat, toLng) => {
 };
 
 exports.createRide = async (req, res) => {
-    console.log('createRide');
-    
     try{
         const {from, to, fromLat, fromLng, toLat, toLng} = req.body;
         const riderId = req.user;
@@ -63,42 +61,54 @@ exports.createRide = async (req, res) => {
             fare
         });
 
-        
-        const response = await axios.post(`${process.env.RABBITMQ_URI}/api/rabbitmq/publish`, {
-            queue: 'new-ride',
-            message: JSON.stringify(newRide)
-        });
-        console.log(response.data);
+
         await newRide.save();
-        res.status(201).json(newRide);
+
+        for(const captainId of captainsList.data.captains){
+            const rideRequest = {
+                rideId: newRide._id,
+                riderId: riderId,
+                from,
+                to,
+                fare
+            }
+
+            await axios.post(`${process.env.RABBITMQ_URI}/api/rabbitmq/publish`, {
+                queue: `ride-request-${captainId}`,
+                message: JSON.stringify(rideRequest)
+            });
+
+            console.log(`Ride request sent to captain ${captainId}`);
+        }
+
+        res.status(201).json({ message: 'Ride request sent to captains', ride: newRide });
     }catch(error){
         res.status(500).json({message: error.message});
     }
 };
 
 exports.acceptRide = async (req, res) => {
-    try{
-        const {rideId} = req.query;
-        const captainId = req.user;
-        const ride = await Ride.findById(rideId);
-        if(!ride){
-            return res.status(404).json({message: 'Ride not found'});
-        }
-        if(ride.status !== 'REQUESTED'){
-            return res.status(400).json({message: 'Ride already accepted'});
-        }
-        ride.captainId = captainId;
-        ride.status = 'ACCEPTED';
-        await ride.save();
+    try {
+        const { rideId } = req.query;
+        const captainId = req.user._id;
+        
 
-        const response = await axios.post(`${process.env.RABBITMQ_URI}/api/rabbitmq/publish`, {
-            queue: 'ride-accepted',
-            message: JSON.stringify(ride)
+        const ride = await Ride.findOneAndUpdate(
+            { _id: rideId, status: 'REQUESTED' },
+            { captainId, status: 'ACCEPTED' },
+            { new: true }
+        );
+
+        if (!ride) {
+            return res.status(400).json({ message: 'Ride already accepted by another captain' });
+        }
+
+        await axios.post(`${process.env.LOCATION_SERVICE}/api/locations/remove-captain`, {
+            captainId
         });
-        console.log(response.data);
-        res.status(200).json(ride);
-    }catch(error){
-        res.status(500).json({message: error.message});
+
+        res.status(200).json({ message: 'Ride accepted successfully', ride });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
-    
 };
