@@ -103,6 +103,8 @@ exports.acceptRide = async (req, res) => {
             return res.status(400).json({ message: 'Ride already accepted by another captain' });
         }
 
+        await ride.save()
+
         await axios.post(`${process.env.LOCATION_SERVICE}/api/locations/remove-captain`, {
             captainId
         });
